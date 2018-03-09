@@ -1,6 +1,6 @@
 /*
 
- Osamelci
+ Osamelci (eng. outliers)
 ,null vrednosti
 ,triki za pohitritev priprave podatkov
 ,normalizacija podatkov
@@ -100,7 +100,6 @@ order by 2
 
 
 
-SELECT TOP 10 * FROM TK_tmp_CustomerAtributes_delavnica
 
 SELECT  
 count(*) AS nof
@@ -161,9 +160,10 @@ EXEC sp_execute_external_script
 				OutputDataSet <- data.frame(m=median(df$inv, na.rm=TRUE))'
    ,@input_data_1 = N'SELECT CAST(avginvoice AS INT) as inv FROM TK_tmp_CustomerAtributes_delavnica'
 WITH RESULT SETS
-(( NUMERIC(16,3)
+((
+median NUMERIC(16,3)
 ))
-	median
+	
 
 
 -- this mean we have NULL values in avginvoice in our dataset
@@ -171,3 +171,66 @@ SELECT * FROM TK_tmp_CustomerAtributes_delavnica
 WHERE
 	avginvoice IS NULL
 
+
+
+--- NULL VALUES
+
+-- povpreèje
+SELECT 
+	 AVG(avginvoice) AS AVG_function
+	,SUM(avginvoice)/COUNT(*) AS AVG_manually
+FROM 
+	TK_tmp_CustomerAtributes_delavnica
+
+-- avg will be the same if we eliminate the null values (per se)
+SELECT 
+	 AVG(avginvoice) AS AVG_function
+	,SUM(avginvoice)/COUNT(*) AS AVG_manually
+FROM 
+	TK_tmp_CustomerAtributes_delavnica
+WHERE
+	avginvoice IS NOT NULL
+
+-- assume we want to calculate Mode:
+
+-- mode
+EXEC sp_execute_external_script
+	@language = N'R'
+   ,@script = N'df <- InputDataSet
+			# Create the function.
+			getmode <- function(v) {
+			   uniqv <- unique(v)
+			   uniqv[which.max(tabulate(match(v, uniqv)))]
+									}
+				OutputDataSet <- data.frame(getmode(df$inv))'
+   ,@input_data_1 = N'SELECT CAST(avginvoice AS INT) as inv FROM TK_tmp_CustomerAtributes_delavnica'
+WITH RESULT SETS
+((
+mode INT
+))
+
+-- ha ha... NULL value is mode:
+SELECT 
+	COUNT(*) AS nof
+	,CAST(avginvoice AS INT) as inv 
+
+FROM TK_tmp_CustomerAtributes_delavnica
+GROUP BY CAST(avginvoice AS INT)
+ORDER BY nof DESC
+
+-- if we eliminate NULL values, the mode should be: 41
+EXEC sp_execute_external_script
+	@language = N'R'
+   ,@script = N'df <- InputDataSet
+			# Create the function.
+			getmode <- function(v) {
+			   uniqv <- unique(v)
+			   uniqv[which.max(tabulate(match(v, uniqv)))]
+									}
+				OutputDataSet <- data.frame(getmode(df$inv))'
+   ,@input_data_1 = N'SELECT CAST(avginvoice AS INT) as inv FROM TK_tmp_CustomerAtributes_delavnica WHERE avginvoice IS NOT NULL'
+	---- -------------------------------------------------------------------------------------------^ added WHERE clause
+WITH RESULT SETS
+((
+mode INT
+))
