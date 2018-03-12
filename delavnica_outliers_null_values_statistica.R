@@ -304,3 +304,8 @@ t.test(x, mu=10) # testing if mean of x could be
 #use wilcoxon signed rank test.
 #Note: Use conf.level argument to adjust the confidence level.  
 
+
+
+# wilcox test
+numeric_vector <- c(20, 29, 24, 19, 20, 22, 28, 23, 19, 19)
+wilcox.test(numeric_vector, mu=20, conf.int = TRUE)
