@@ -1,5 +1,12 @@
 /*
+Prepriprava in Obdelava podatkov - Delavnica GNi
+Date: 12.03.2018
+Authour: Hercule Poirot
 
+
+*/
+
+/*
  Osamelci (eng. outliers)
 ,null vrednosti
 ,triki za pohitritev priprave podatkov
@@ -11,7 +18,7 @@
 
 ----------------------
 ---
----tabela atributi
+--- Attribute TAble
 ---
 ----------------------
 SELECT TOP 10000
@@ -239,6 +246,7 @@ mode INT
 
 ----------------------------------
 ---------- GETTING STATISTICS
+-- 1. DESCRIPTIVE STATISTICS
 ----------------------------------
 
 EXEC sp_execute_external_script
@@ -366,3 +374,111 @@ EXEC dbo.Descriptive_Stats
 EXEC dbo.Descriptive_Stats
 	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
 	,@ColumnName = N'subvencij'
+
+
+EXEC dbo.Descriptive_Stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'numberofmonths'
+
+
+
+----------------------------------
+---------- GETTING STATISTICS
+-- 2. FREQUENCY TABLES
+----------------------------------
+
+
+
+EXEC sp_execute_external_script
+	@language = N'R'
+   ,@script = N'df <- InputDataSet
+			library(dplyr)
+			df2<- df %>%
+				count(inv) %>%
+				mutate(prop = prop.table(n))
+				OutputDataSet <- data.frame(df2)'
+   ,@input_data_1 = N'SELECT CAST(avginvoice AS INT) as inv FROM TK_tmp_CustomerAtributes_delavnica WHERE avginvoice IS NOT NULL'
+	---- -------------------------------------------------------------------------------------------^ added WHERE clause
+WITH RESULT SETS
+((
+ var_value NVARCHAR(100)
+,var_n NVARCHAR(100)
+,var_percent NVARCHAR(100)
+))
+
+
+--- Parametrizration
+-- fla fla
+
+CREATE OR ALTER PROCEDURE dbo.Frequncy_stats
+(
+	 @TableName NVARCHAR(100)
+	,@ColumnName NVARCHAR(100)
+)
+AS
+BEGIN
+
+DECLARE @Rcode NVARCHAR(MAX)
+SET @Rcode = N'df <- InputDataSet
+			library(dplyr)
+			df2<- df %>%
+				count(inv) %>%
+				mutate(prop = prop.table(n))
+				OutputDataSet <- data.frame(df2)'
+
+DECLARE @TSQLcode NVARCHAR(MAX)
+SET @TSQLcode = N'SELECT CAST('+CAST(@ColumnName AS NVARCHAR(100))+' AS INT) as inv FROM '+@TableName+' WHERE '+CAST(@ColumnName AS VARCHAR(100))+' IS NOT NULL '
+PRINT @TSQLcode
+
+EXEC sp_execute_external_script
+	@language = N'R'
+   ,@script = @Rcode
+   ,@input_data_1 = @TSQLCode
+	
+WITH RESULT SETS
+((
+ var_value NVARCHAR(100)
+,var_n NVARCHAR(100)
+,var_percent NVARCHAR(100)
+))
+
+END
+GO
+
+
+EXEC dbo.Frequncy_stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'quantity'
+
+
+
+EXEC dbo.Frequncy_stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'avgprodajnacena'
+
+
+EXEC dbo.Frequncy_stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'amount'
+
+
+EXEC dbo.Frequncy_stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'subvencij'
+
+
+-- Do a sort!
+-- either with dplyr in R on in T-SQL
+DECLARE @T TABLE(
+ var_value NVARCHAR(100)
+,var_n INT
+,var_percent NVARCHAR(100)
+)
+
+INSERT INTO @T
+EXEC dbo.Frequncy_stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'numberofmonths'
+
+SELECT * FROM @T 
+ORDER BY var_n DESC
