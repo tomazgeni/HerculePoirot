@@ -234,3 +234,135 @@ WITH RESULT SETS
 ((
 mode INT
 ))
+
+
+
+----------------------------------
+---------- GETTING STATISTICS
+----------------------------------
+
+EXEC sp_execute_external_script
+	@language = N'R'
+   ,@script = N'df <- InputDataSet
+			library(dplyr)
+			df2<- df %>%
+				summarise(
+						   mean=mean(inv)
+						  ,sd=sd(inv)
+						  ,median=median(inv)
+						  ,min=min(inv)
+						  ,max=max(inv)
+						  ,var=var(inv)
+						  ,mode=mode(inv)
+						  ,n = n()
+						  ,total = sum(inv)
+						  ,P25=quantile(inv, probs=0.25)
+						 ,P50=quantile(inv, probs=0.5)
+						 ,P75=quantile(inv, probs=0.75)
+						 ,avg=mean(inv)
+						  )
+				OutputDataSet <- data.frame(df2)'
+   ,@input_data_1 = N'SELECT CAST(avginvoice AS INT) as inv FROM TK_tmp_CustomerAtributes_delavnica WHERE avginvoice IS NOT NULL'
+	---- -------------------------------------------------------------------------------------------^ added WHERE clause
+WITH RESULT SETS
+((
+ mean NVARCHAR(100)
+,sd NVARCHAR(100)
+,median NVARCHAR(100)
+,min NVARCHAR(100)
+,max NVARCHAR(100)
+,var NVARCHAR(100)
+,mode NVARCHAR(100)
+,nof_rows NVARCHAR(100)
+,sum_total NVARCHAR(100)
+,P25 NVARCHAR(100)
+,P50 NVARCHAR(100)
+,P75 NVARCHAR(100)
+,avg NVARCHAR(100)
+))
+
+
+--- PARAMETRIZATION
+
+CREATE OR ALTER PROCEDURE dbo.Descriptive_Stats
+(
+	 @TableName NVARCHAR(100)
+	,@ColumnName NVARCHAR(100)
+)
+AS
+BEGIN
+
+DECLARE @Rcode NVARCHAR(MAX)
+SET @Rcode = N'df <- InputDataSet
+			library(dplyr)
+			df2<- df %>%
+				summarise(
+						   mean=mean(inv)
+						  ,sd=sd(inv)
+						  ,median=median(inv)
+						  ,min=min(inv)
+						  ,max=max(inv)
+						  ,var=var(inv)
+						  ,mode=mode(inv)
+						  ,n = n()
+						  ,total = sum(inv)
+						  ,P25=quantile(inv, probs=0.25)
+						 ,P50=quantile(inv, probs=0.5)
+						 ,P75=quantile(inv, probs=0.75)
+						 ,avg=mean(inv, na.rm=TRUE)
+						  )
+				OutputDataSet <- data.frame(df2)'
+
+DECLARE @TSQLcode NVARCHAR(MAX)
+SET @TSQLcode = N'SELECT CAST('+CAST(@ColumnName AS NVARCHAR(100))+' AS INT) as inv FROM '+@TableName+' WHERE '+CAST(@ColumnName AS VARCHAR(100))+' IS NOT NULL '
+PRINT @TSQLcode
+
+EXEC sp_execute_external_script
+	@language = N'R'
+   ,@script = @Rcode
+   ,@input_data_1 = @TSQLCode
+	
+WITH RESULT SETS
+((
+ mean NVARCHAR(100)
+,sd NVARCHAR(100)
+,median NVARCHAR(100)
+,min NVARCHAR(100)
+,max NVARCHAR(100)
+,var NVARCHAR(100)
+,mode NVARCHAR(100)
+,nof_rows NVARCHAR(100)
+,sum_total NVARCHAR(100)
+,P25 NVARCHAR(100)
+,P50 NVARCHAR(100)
+,P75 NVARCHAR(100)
+,avg NVARCHAR(100)
+))
+
+END
+GO
+
+
+SELECT top 10 * FROM TK_tmp_CustomerAtributes_delavnica
+
+
+
+EXEC dbo.Descriptive_Stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'quantity'
+
+
+
+EXEC dbo.Descriptive_Stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'avgprodajnacena'
+
+
+EXEC dbo.Descriptive_Stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'amount'
+
+
+EXEC dbo.Descriptive_Stats
+	 @TableName = N'TK_tmp_CustomerAtributes_delavnica'
+	,@ColumnName = N'subvencij'
